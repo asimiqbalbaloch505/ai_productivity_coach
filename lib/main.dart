@@ -4,10 +4,16 @@ import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/focus_analytics/screens/focus_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
 import 'features/tasks/screens/tasks_list_screen.dart';
+import 'db_helper.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await DBHelper.init();
+
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
