@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'db_helper.dart';
 import 'features/ai_coach/screens/ai_coach_screen.dart';
+import 'features/dashboard/dashboard_models.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/focus_analytics/screens/focus_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
 import 'features/tasks/screens/tasks_list_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DBHelper.init();
   runApp(const MyApp());
 }
 
@@ -40,13 +44,37 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    TasksListScreen(),
-    HabitsScreen(),
-    FocusScreen(),
-    AiCoachScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(
+      // TEMPORARY: paste a seeded user UUID to test before Auth is merged,
+      // then remove this line.
+      // testUserId: 'PASTE_A_SEEDED_USER_UUID',
+      onNavigate: _onDashboardNavigate,
+    ),
+    const TasksListScreen(),
+    const HabitsScreen(),
+    const FocusScreen(),
+    const AiCoachScreen(),
   ];
+
+  void _onDashboardNavigate(DashboardDestination destination) {
+    switch (destination) {
+      case DashboardDestination.tasks:
+        setState(() => _selectedIndex = 1);
+      case DashboardDestination.habits:
+        setState(() => _selectedIndex = 2);
+      case DashboardDestination.focus:
+        setState(() => _selectedIndex = 3);
+      case DashboardDestination.aiCoach:
+        setState(() => _selectedIndex = 4);
+      case DashboardDestination.analytics:
+      case DashboardDestination.profile:
+      case DashboardDestination.notifications:
+        // Not bottom-bar tabs. Open with Navigator.push once those
+        // screens are merged into main.
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
