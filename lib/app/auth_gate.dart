@@ -17,7 +17,9 @@ class _AuthGateState extends State<AuthGate> {
   late Session? _session = Supabase.instance.client.auth.currentSession;
   late final StreamSubscription<AuthState> _authSubscription =
       Supabase.instance.client.auth.onAuthStateChange.listen((state) {
-    if (mounted) setState(() => _session = state.session);
+    if (mounted && _session?.accessToken != state.session?.accessToken) {
+      setState(() => _session = state.session);
+    }
   });
 
   @override

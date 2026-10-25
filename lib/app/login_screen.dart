@@ -73,10 +73,17 @@ class _LoginScreenState extends State<LoginScreen> {
           _isSignUp = false;
         });
       } else {
-        await Supabase.instance.client.auth.signInWithPassword(
+        final response = await Supabase.instance.client.auth.signInWithPassword(
           email: email,
           password: password,
         );
+        if (!mounted) return;
+        if (response.session == null) {
+          setState(() {
+            _isError = true;
+            _message = 'Sign-in needs confirmation. Check your email, then try again.';
+          });
+        }
       }
     } on AuthException catch (e) {
       if (mounted) {
