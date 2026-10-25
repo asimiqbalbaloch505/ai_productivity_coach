@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final ValueChanged<Session> onSignedIn;
+
+  const LoginScreen({super.key, required this.onSignedIn});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -72,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
               : 'Account created. You are now signed in.';
           _isSignUp = false;
         });
+        if (response.session != null) widget.onSignedIn(response.session!);
       } else {
         final response = await Supabase.instance.client.auth.signInWithPassword(
           email: email,
@@ -83,6 +86,8 @@ class _LoginScreenState extends State<LoginScreen> {
             _isError = true;
             _message = 'Sign-in needs confirmation. Check your email, then try again.';
           });
+        } else {
+          widget.onSignedIn(response.session!);
         }
       }
     } on AuthException catch (e) {
