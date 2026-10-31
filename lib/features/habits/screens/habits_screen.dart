@@ -4,6 +4,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../notifications/screens/notification_screen.dart';
+import '../../profile/screens/profile_screen.dart';
 import '../habit_models.dart';
 import '../habit_styles.dart';
 import '../habits_db_helper.dart';
@@ -18,11 +20,7 @@ class HabitsScreen extends StatefulWidget {
   final VoidCallback? onNotificationsTap;
   final VoidCallback? onProfileTap;
 
-  const HabitsScreen({
-    super.key,
-    this.onNotificationsTap,
-    this.onProfileTap,
-  });
+  const HabitsScreen({super.key, this.onNotificationsTap, this.onProfileTap});
 
   @override
   State<HabitsScreen> createState() => _HabitsScreenState();
@@ -122,10 +120,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final byDay = _logs[habit.id];
     if (byDay == null) return 0;
     return byDay.entries
-        .where((e) =>
-    !e.key.isBefore(weekStart) &&
-        !e.key.isAfter(_today) &&
-        e.value.status == HabitLogStatus.completed)
+        .where(
+          (e) =>
+              !e.key.isBefore(weekStart) &&
+              !e.key.isAfter(_today) &&
+              e.value.status == HabitLogStatus.completed,
+        )
         .length;
   }
 
@@ -168,10 +168,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
   // ----------------------------------------------------------------- actions
 
   Future<void> _run(
-      Habit habit,
-      Future<int> Function() action, {
-        String? message,
-      }) async {
+    Habit habit,
+    Future<int> Function() action, {
+    String? message,
+  }) async {
     setState(() => _busyIds.add(habit.id));
     try {
       await action();
@@ -191,7 +191,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
     return _run(
       habit,
-          () => _db.setLog(habit, HabitLogStatus.completed),
+      () => _db.setLog(habit, HabitLogStatus.completed),
       message: 'Nice! "${habit.title}" completed',
     );
   }
@@ -222,17 +222,28 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 ),
               ),
             ),
-            _actionTile(ctx, Icons.check_circle_outline_rounded,
-                'Mark as completed', 'complete'),
             _actionTile(
-                ctx, Icons.skip_next_rounded, 'Skip for today', 'skip'),
+              ctx,
+              Icons.check_circle_outline_rounded,
+              'Mark as completed',
+              'complete',
+            ),
+            _actionTile(ctx, Icons.skip_next_rounded, 'Skip for today', 'skip'),
             if (hasLog)
-              _actionTile(ctx, Icons.undo_rounded, "Clear today's check-in",
-                  'clear'),
+              _actionTile(
+                ctx,
+                Icons.undo_rounded,
+                "Clear today's check-in",
+                'clear',
+              ),
             _actionTile(ctx, Icons.edit_outlined, 'Edit habit', 'edit'),
-            _actionTile(ctx, Icons.delete_outline_rounded, 'Delete habit',
-                'delete',
-                color: HabitColors.danger),
+            _actionTile(
+              ctx,
+              Icons.delete_outline_rounded,
+              'Delete habit',
+              'delete',
+              color: HabitColors.danger,
+            ),
             const SizedBox(height: 8),
           ],
         ),
@@ -243,13 +254,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
       case 'complete':
         await _run(
           habit,
-              () => _db.setLog(habit, HabitLogStatus.completed),
+          () => _db.setLog(habit, HabitLogStatus.completed),
           message: 'Nice! "${habit.title}" completed',
         );
       case 'skip':
         await _run(
           habit,
-              () => _db.setLog(habit, HabitLogStatus.skipped),
+          () => _db.setLog(habit, HabitLogStatus.skipped),
           message: '"${habit.title}" skipped for today',
         );
       case 'clear':
@@ -262,12 +273,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 
   Widget _actionTile(
-      BuildContext ctx,
-      IconData icon,
-      String label,
-      String value, {
-        Color color = HabitColors.textDark,
-      }) {
+    BuildContext ctx,
+    IconData icon,
+    String label,
+    String value, {
+    Color color = HabitColors.textDark,
+  }) {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(label, style: TextStyle(color: color)),
@@ -359,8 +370,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
         padding: const EdgeInsets.all(HabitStyles.screenPadding),
         children: [
           const SizedBox(height: 120),
-          const Icon(Icons.cloud_off_rounded,
-              size: 52, color: HabitColors.textMuted),
+          const Icon(
+            Icons.cloud_off_rounded,
+            size: 52,
+            color: HabitColors.textMuted,
+          ),
           const SizedBox(height: 12),
           const Text(
             'Could not load your habits',
@@ -470,7 +484,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
         ),
         const Spacer(),
         GestureDetector(
-          onTap: widget.onNotificationsTap,
+          onTap:
+              widget.onNotificationsTap ??
+              () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationScreen()),
+              ),
           behavior: HitTestBehavior.opaque,
           child: const SizedBox(
             width: 32,
@@ -478,8 +496,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Icon(Icons.notifications_none_rounded,
-                    size: 22, color: HabitColors.textDark),
+                Icon(
+                  Icons.notifications_none_rounded,
+                  size: 22,
+                  color: HabitColors.textDark,
+                ),
                 Positioned(
                   top: 4,
                   right: 6,
@@ -494,7 +515,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
         ),
         const SizedBox(width: 10),
         GestureDetector(
-          onTap: widget.onProfileTap,
+          onTap:
+              widget.onProfileTap ??
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              ),
           child: CircleAvatar(
             radius: 15,
             backgroundColor: HabitColors.momentumCard,
@@ -541,8 +567,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   color: HabitColors.textMuted,
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 18, color: HabitColors.textMuted),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: HabitColors.textMuted,
+              ),
             ],
           ),
         ),
@@ -579,9 +608,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  percent >= 50
-                      ? "You're building momentum"
-                      : 'Keep it going',
+                  percent >= 50 ? "You're building momentum" : 'Keep it going',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -589,8 +616,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   ),
                 ),
               ),
-              const Icon(Icons.trending_up_rounded,
-                  size: 20, color: HabitColors.primary),
+              const Icon(
+                Icons.trending_up_rounded,
+                size: 20,
+                color: HabitColors.primary,
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -669,8 +699,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
           PopupMenuButton<String>(
             padding: EdgeInsets.zero,
             color: HabitColors.card,
-            icon: const Icon(Icons.more_horiz_rounded,
-                color: HabitColors.textMuted),
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              color: HabitColors.textMuted,
+            ),
             onSelected: (value) {
               if (value == 'new') _openForm();
               if (value == 'refresh') _load();
@@ -693,7 +725,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         title: habit.title,
         subtitle: isWeekly
             ? '${_daysDoneThisWeek(habit)} of 7 days · '
-            '${habit.streakCount} ${habit.frequency.unit} streak'
+                  '${habit.streakCount} ${habit.frequency.unit} streak'
             : '${habit.streakCount} ${habit.frequency.unit} streak',
         status: log?.status,
         isWeekly: isWeekly,

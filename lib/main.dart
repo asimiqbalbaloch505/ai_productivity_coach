@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'features/ai_coach/screens/ai_coach_screen.dart';
+import 'features/auth/screens/login_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/focus_analytics/screens/focus_screen.dart';
 import 'features/habits/screens/habits_screen.dart';
@@ -13,7 +16,6 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -31,7 +33,28 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFFFFFDF5),
         useMaterial3: true,
       ),
-      home: const MainNavigationScreen(),
+      home: const _AuthenticationRouter(),
+    );
+  }
+}
+
+class _AuthenticationRouter extends StatelessWidget {
+  const _AuthenticationRouter();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Supabase.instance.client.auth;
+    return StreamBuilder<AuthState>(
+      stream: auth.onAuthStateChange,
+      initialData: AuthState(
+        AuthChangeEvent.initialSession,
+        auth.currentSession,
+      ),
+      builder: (context, snapshot) {
+        final session = snapshot.data?.session ?? auth.currentSession;
+        if (session?.user == null) return const LoginScreen();
+        return const MainNavigationScreen();
+      },
     );
   }
 }
@@ -60,9 +83,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: _screens[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Color(0xFFEFEBE0), width: 1.0),
-          ),
+          border: Border(top: BorderSide(color: Color(0xFFEFEBE0), width: 1.0)),
         ),
         child: NavigationBarTheme(
           data: NavigationBarThemeData(

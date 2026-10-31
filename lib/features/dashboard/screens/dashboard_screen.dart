@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../auth/screens/login_screen.dart';
+import '../../notifications/screens/notification_screen.dart';
+import '../../profile/screens/profile_screen.dart';
 import '../dashboard_db_helper.dart';
 import '../dashboard_models.dart';
 import '../dashboard_theme.dart';
@@ -31,7 +34,9 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late final DashboardDBHelper _db = DashboardDBHelper(overrideUserId: widget.testUserId);
+  late final DashboardDBHelper _db = DashboardDBHelper(
+    overrideUserId: widget.testUserId,
+  );
 
   DashboardData? _data;
   DashboardException? _error;
@@ -64,21 +69,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _go(DashboardDestination d) => widget.onNavigate?.call(d);
 
+  void _openNotifications() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+    );
+  }
+
+  void _retry() {
+    if (_error?.message == 'You are signed out. Log in to see your day.') {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+    _load();
+  }
+
   Future<void> _toggleTask(DashTask task) async {
     final data = _data;
     if (data == null) return;
     final next = !task.isCompleted;
     List<DashTask> swap(bool completed) => [
-          for (final t in data.tasks) t.id == task.id ? t.copyWith(isCompleted: completed) : t
-        ];
+      for (final t in data.tasks)
+        t.id == task.id ? t.copyWith(isCompleted: completed) : t,
+    ];
     setState(() => _data = data.copyWith(tasks: swap(next))); // optimistic
     try {
       await _db.setTaskCompleted(task.id, next);
     } on DashboardException catch (e) {
       if (!mounted) return;
       setState(() => _data = _data?.copyWith(tasks: swap(!next)));
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Couldn't update the task. ${e.message}")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Couldn't update the task. ${e.message}")),
+      );
     }
   }
 
@@ -103,10 +133,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String get _dateLabel {
-    const wd = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const wd = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     const mo = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final n = DateTime.now();
     return '${wd[n.weekday - 1]}, ${mo[n.month - 1]} ${n.day}';
@@ -116,20 +164,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DashColors.background,
-      bottomNavigationBar:
-          widget.showBottomNav ? DashboardBottomNav(current: 0, onTap: _onNavTap) : null,
+      bottomNavigationBar: widget.showBottomNav
+          ? DashboardBottomNav(current: 0, onTap: _onNavTap)
+          : null,
       body: SafeArea(
         bottom: false,
         child: _loading && _data == null
             ? const DashboardSkeleton()
             : (_error != null && _data == null)
-                ? DashboardErrorView(
-                    message: _error!.message, isOffline: _error!.isOffline, onRetry: _load)
-                : RefreshIndicator(
-                    color: DashColors.primary,
-                    onRefresh: () => _load(showSpinner: false),
-                    child: _content(_data!),
-                  ),
+            ? DashboardErrorView(
+                message: _error!.message,
+                isOffline: _error!.isOffline,
+                onRetry: _retry,
+              )
+            : RefreshIndicator(
+                color: DashColors.primary,
+                onRefresh: () => _load(showSpinner: false),
+                child: _content(_data!),
+              ),
       ),
     );
   }
@@ -140,31 +192,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(DashDims.pagePad, 8, DashDims.pagePad, 24),
+      padding: const EdgeInsets.fromLTRB(
+        DashDims.pagePad,
+        8,
+        DashDims.pagePad,
+        24,
+      ),
       children: [
         if (_error != null)
           Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-                color: DashColors.lavender, borderRadius: BorderRadius.circular(12)),
-            child: Text('Showing your last loaded data. ${_error!.message}',
-                style: const TextStyle(fontSize: 13, color: DashColors.lavenderText)),
+              color: DashColors.lavender,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'Showing your last loaded data. ${_error!.message}',
+              style: const TextStyle(
+                fontSize: 13,
+                color: DashColors.lavenderText,
+              ),
+            ),
           ),
         DashHeader(
           initials: d.initials,
           hasUnread: d.unreadNotifications > 0,
-          onBell: () => _go(DashboardDestination.notifications),
-          onAvatar: () => _go(DashboardDestination.profile),
+          onBell: _openNotifications,
+          onAvatar: _openProfile,
         ),
         const SizedBox(height: 14),
-        DateRow(label: _dateLabel, onCalendar: () => _go(DashboardDestination.tasks)),
+        DateRow(
+          label: _dateLabel,
+          onCalendar: () => _go(DashboardDestination.tasks),
+        ),
         const SizedBox(height: 22),
         Text('$_greeting, ${d.firstName}', style: DashText.greeting),
         const SizedBox(height: 6),
-        const Text('A focused day starts with one clear next step.', style: DashText.subtitle),
+        const Text(
+          'A focused day starts with one clear next step.',
+          style: DashText.subtitle,
+        ),
         const SizedBox(height: 22),
-        InsightCard(text: d.insightText, onViewPlan: () => _go(DashboardDestination.aiCoach)),
+        InsightCard(
+          text: d.insightText,
+          onViewPlan: () => _go(DashboardDestination.aiCoach),
+        ),
         const SizedBox(height: 28),
         const SectionTitle('Today at a glance'),
         const SizedBox(height: 12),
@@ -203,8 +276,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         CoachPromptCard(onAsk: () => _go(DashboardDestination.aiCoach)),
         const SizedBox(height: 28),
-        SectionTitle('Habits today',
-            action: 'See all', onAction: () => _go(DashboardDestination.habits)),
+        SectionTitle(
+          'Habits today',
+          action: 'See all',
+          onAction: () => _go(DashboardDestination.habits),
+        ),
         const SizedBox(height: 12),
         if (habits.isEmpty)
           DashEmptyCard(

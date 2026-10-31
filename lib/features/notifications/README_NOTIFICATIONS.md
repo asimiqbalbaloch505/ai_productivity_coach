@@ -20,6 +20,11 @@ Initialize Supabase in the application's main entrypoint, authenticate the user,
 
 Make sure the team lead configures row-level security for user-specific reads and writes. No service-role key belongs in client code.
 
+Other features can insert a notification for the signed-in user with
+`NotificationHelper().sendNotification(title: '...', body: '...', type: 'task')`.
+The top-level `sendNotification(...)` helper is also available for simple call
+sites. The `type` defaults to `system`.
+
 ## Known integration limitations
 
 - Master notification and overdue task toggles are UI-only until the lead approves schema additions; their state does not persist after leaving the screen.

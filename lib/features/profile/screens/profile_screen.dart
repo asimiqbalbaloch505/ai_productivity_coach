@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../profile_models.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../auth/screens/login_screen.dart';
 import '../profile_db_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -11,16 +13,23 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final ProfileDBHelper _dbHelper = ProfileDBHelper();
-  
-  bool _isLoading = true;
-  String _fullName = 'Alex Morgan'; 
-  String _email = 'alex@example.com';
-  int _dailyGoalMinutes = 60;
-  int _dailyTasks = 6;
 
-  final Color bgColor = const Color(0xFFFFF7EF); 
-  final Color primaryGreen = const Color(0xFF006C45); 
+  bool _isLoading = true;
+  String _fullName = '';
+  String _email = '';
+  String? _profileError;
+  int _dailyGoalMinutes = 60;
+  final int _dailyTasks = 6;
+
+  final Color bgColor = const Color(0xFFFFF7EF);
+  final Color primaryGreen = const Color(0xFF006C45);
   final Color cardColor = Colors.white;
+
+  String get _displayName {
+    if (_fullName.trim().isNotEmpty) return _fullName.trim();
+    if (_email.trim().isNotEmpty) return _email.trim();
+    return 'Account';
+  }
 
   @override
   void initState() {
@@ -29,35 +38,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileData() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    var profileName = '';
+    var profileEmail = '';
+    var dailyGoalMinutes = _dailyGoalMinutes;
+    String? profileError;
     try {
       final profile = await _dbHelper.getUserProfile();
       if (profile != null) {
-        setState(() {
-          _fullName = profile.fullName ?? 'Alex Morgan';
-          _email = profile.email ?? 'No email provided';
-          _dailyGoalMinutes = profile.dailyGoalMinutes;
-        });
+        profileName = profile.fullName?.trim() ?? '';
+        profileEmail = profile.email?.trim() ?? '';
+        dailyGoalMinutes = profile.dailyGoalMinutes;
       }
     } catch (e) {
-      debugPrint('Error loading profile: $e');
-    } finally {
-      setState(() => _isLoading = false);
+      profileError = 'Unable to load additional profile details: $e';
     }
+
+    if (!mounted) return;
+    final metadataName = user?.userMetadata?['full_name'];
+    final authName = metadataName is String ? metadataName.trim() : '';
+    final authEmail = user?.email?.trim() ?? '';
+    setState(() {
+      _fullName = profileName.isNotEmpty ? profileName : authName;
+      _email = authEmail.isNotEmpty ? authEmail : profileEmail;
+      _dailyGoalMinutes = dailyGoalMinutes;
+      _profileError = profileError;
+      _isLoading = false;
+    });
   }
 
   String getInitials(String name) {
-    List<String> names = name.trim().split(" ");
-    String initials = "";
-    int numWords = names.length > 2 ? 2 : names.length;
-    for (int i = 0; i < numWords; i++) {
-      if (names[i].isNotEmpty) initials += names[i][0].toUpperCase();
+    final source = name.trim();
+    if (source.isEmpty) return '?';
+    final namePart = source.contains('@')
+        ? source.split('@').first.replaceAll(RegExp(r'[._-]+'), ' ')
+        : source;
+    final words = namePart
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList();
+    if (words.length > 1) {
+      return '${words[0][0]}${words[1][0]}'.toUpperCase();
     }
-    return initials.isEmpty ? "AM" : initials;
+    final compact = namePart.replaceAll(RegExp(r'\s+'), '');
+    if (compact.isEmpty) return '?';
+    return compact.substring(0, compact.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  Future<void> _signOut() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to sign out: $error')));
+    }
   }
 
   void _showEditProfileForm() {
-    final TextEditingController nameController = TextEditingController(text: _fullName);
-    final TextEditingController goalController = TextEditingController(text: _dailyGoalMinutes.toString());
+    final TextEditingController nameController = TextEditingController(
+      text: _fullName,
+    );
+    final TextEditingController goalController = TextEditingController(
+      text: _dailyGoalMinutes.toString(),
+    );
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -73,30 +123,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24, right: 24, top: 30,
+                left: 24,
+                right: 24,
+                top: 30,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Edit Profile', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: primaryGreen)),
+                  Text(
+                    'Edit Profile',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: primaryGreen,
+                    ),
+                  ),
                   const SizedBox(height: 24),
-                  
-                  const Text('Full name', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+
+                  const Text(
+                    'Full name',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: nameController,
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryGreen)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryGreen),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  const Text('Focus time (Minutes)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Focus time (Minutes)',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: goalController,
@@ -104,9 +178,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.white,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryGreen)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryGreen),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -115,36 +198,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: isSaving ? null : () async {
-                        setModalState(() => isSaving = true);
-                        int newGoal = int.tryParse(goalController.text) ?? 60;
-                        
-                        // Supabase database update attempt (catches error in local test mode without crashing UI)
-                        try {
-                          await _dbHelper.updateProfile(
-                            fullName: nameController.text,
-                            dailyGoalMinutes: newGoal,
-                          );
-                        } catch (e) {
-                          debugPrint('Local test mode database sync skipped: $e');
-                        }
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              setModalState(() => isSaving = true);
+                              int newGoal =
+                                  int.tryParse(goalController.text) ?? 60;
 
-                        // Local UI state update & Sheet Close (always executes smoothly)
-                        if (mounted) {
-                          setState(() {
-                            _fullName = nameController.text.trim();
-                            _dailyGoalMinutes = newGoal;
-                          });
-                          Navigator.pop(context);
-                        }
-                      },
+                              try {
+                                await _dbHelper.updateProfile(
+                                  fullName: nameController.text,
+                                  dailyGoalMinutes: newGoal,
+                                );
+                              } catch (e) {
+                                if (context.mounted) {
+                                  setModalState(() => isSaving = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Unable to save profile: $e',
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
+
+                              if (!mounted || !context.mounted) return;
+                              setState(() {
+                                _fullName = nameController.text.trim();
+                                _dailyGoalMinutes = newGoal;
+                              });
+                              Navigator.pop(context);
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryGreen,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: isSaving
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Save Changes', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Save Changes',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -165,31 +267,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: _isLoading
             ? Center(child: CircularProgressIndicator(color: primaryGreen))
             : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20.0,
+                  vertical: 10.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.arrow_back, color: Colors.black54),
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.black54,
+                          ),
+                        ),
                         Text(
                           'daywise',
-                          style: TextStyle(color: primaryGreen, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+                          style: TextStyle(
+                            color: primaryGreen,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
                         ),
                         CircleAvatar(
                           radius: 16,
                           backgroundColor: Colors.orange.shade100,
-                          child: Text(getInitials(_fullName), style: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold)),
+                          child: Text(
+                            getInitials(_displayName),
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
+                    if (_profileError != null) ...[
+                      Text(
+                        _profileError!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Profile', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
-                        Icon(Icons.settings_outlined, color: Colors.grey.shade700),
+                        const Text(
+                          'Profile',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Icon(
+                          Icons.settings_outlined,
+                          color: Colors.grey.shade700,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -199,51 +339,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       decoration: BoxDecoration(
                         color: cardColor,
                         borderRadius: BorderRadius.circular(24),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Column(
                         children: [
                           CircleAvatar(
                             radius: 35,
                             backgroundColor: Colors.orange.shade100,
-                            child: Text(getInitials(_fullName), style: const TextStyle(color: Colors.black87, fontSize: 24, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              getInitials(_displayName),
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
-                          Text(_fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text(
+                            _displayName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text(_email, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                          Text(
+                            _email.isEmpty ? 'No email available' : _email,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                           const SizedBox(height: 16),
                           OutlinedButton(
                             onPressed: _showEditProfileForm,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.black87,
                               side: BorderSide(color: Colors.grey.shade300),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 8,
+                              ),
                             ),
-                            child: const Text('Edit profile', style: TextStyle(fontWeight: FontWeight.w600)),
+                            child: const Text(
+                              'Edit profile',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 30),
-                    const Text('Your goals', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Your goals',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Container(
-                      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Column(
                         children: [
                           _buildListTile('Daily tasks', '$_dailyTasks tasks'),
                           Divider(height: 1, color: Colors.grey.shade200),
-                          _buildListTile('Focus time', '$_dailyGoalMinutes min'),
+                          _buildListTile(
+                            'Focus time',
+                            '$_dailyGoalMinutes min',
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 30),
-                    const Text('Preferences', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Preferences',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Container(
-                      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Column(
                         children: [
                           _buildListTile('Notifications', ''),
@@ -254,28 +448,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 28),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _signOut,
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Sign Out'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade700,
+                          side: BorderSide(color: Colors.red.shade200),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: bgColor,
-        selectedItemColor: Colors.black87,
-        unselectedItemColor: Colors.grey.shade500,
-        showSelectedLabels: true,
-        showUnselectedLabels: true,
-        selectedFontSize: 10,
-        unselectedFontSize: 10,
-        elevation: 0,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: 'Today'),
-          BottomNavigationBarItem(icon: Icon(Icons.check_box_outlined), label: 'Tasks'),
-          BottomNavigationBarItem(icon: Icon(Icons.loop), label: 'Habits'),
-          BottomNavigationBarItem(icon: Icon(Icons.gps_fixed), label: 'Focus'),
-          BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'Coach'),
-        ],
       ),
     );
   }
@@ -286,12 +476,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
           Row(
             children: [
-              if (trailingText.isNotEmpty) Text(trailingText, style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
+              if (trailingText.isNotEmpty)
+                Text(
+                  trailingText,
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                ),
               if (trailingText.isNotEmpty) const SizedBox(width: 8),
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey.shade400),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: Colors.grey.shade400,
+              ),
             ],
           ),
         ],

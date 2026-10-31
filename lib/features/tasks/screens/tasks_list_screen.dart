@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../profile/screens/profile_screen.dart';
 import '../task_models.dart';
 import '../tasks_db_helper.dart';
 import 'add_task_screen.dart';
@@ -136,7 +137,22 @@ class _TasksListScreenState extends State<TasksListScreen> {
   Widget build(BuildContext context) {
     final tasks = _visibleTasks;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasks')),
+      appBar: AppBar(
+        title: const Text('Tasks'),
+        actions: [
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            ),
+            icon: const CircleAvatar(
+              radius: 16,
+              child: Text('AM', style: TextStyle(fontSize: 11)),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addTask,
         child: const Icon(Icons.add),
@@ -216,7 +232,6 @@ class _TasksListScreenState extends State<TasksListScreen> {
                   ),
           ),
         ],
->>>>>>> origin/feature/tasks
       ),
     );
   }

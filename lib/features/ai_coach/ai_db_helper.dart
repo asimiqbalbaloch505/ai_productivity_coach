@@ -1,13 +1,9 @@
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ai_models.dart';
 
 class CoachPlan {
-  const CoachPlan({
-    required this.title,
-    required this.explanation,
-  });
+  const CoachPlan({required this.title, required this.explanation});
 
   final String title;
   final String explanation;
@@ -15,7 +11,7 @@ class CoachPlan {
 
 class AiDbHelper {
   AiDbHelper({SupabaseClient? client})
-      : _client = client ?? Supabase.instance.client;
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
 
@@ -53,16 +49,30 @@ class AiDbHelper {
   // ---------------------------------------------------------------------------
 
   Future<CoachPlan> generateDailyPlan(
-      CoachContext context, {
-        List<String> previousPlans = const [],
-      }) async {
-    final response = await _client.functions.invoke(
-      'smooth-api',
-      body: {
-        'action': 'plan',
-        'previous_plans': previousPlans,
-      },
-    );
+    CoachContext context, {
+    List<String> previousPlans = const [],
+  }) async {
+    await _ensureAuthenticatedProfile();
+
+    final FunctionResponse response;
+    try {
+      response = await _client.functions.invoke(
+        'smooth-api',
+        body: {'action': 'plan', 'previous_plans': previousPlans},
+      );
+    } on FunctionsHttpException catch (error) {
+      throw Exception(
+        error.status >= 500
+            ? 'The AI coach is temporarily unavailable. Please try again shortly.'
+            : 'The AI coach could not generate guidance (HTTP ${error.status}).',
+      );
+    } on FunctionException catch (error) {
+      throw Exception(
+        error.status == 0 || error.status >= 500
+            ? 'The AI coach is temporarily unavailable. Please try again shortly.'
+            : 'The AI coach could not generate guidance (HTTP ${error.status}).',
+      );
+    }
 
     final data = response.data;
 
@@ -92,9 +102,35 @@ class AiDbHelper {
       }
     }
 
-    throw Exception(
-      'The AI function returned an unexpected response.',
-    );
+    throw Exception('The AI function returned an unexpected response.');
+  }
+
+  Future<void> _ensureAuthenticatedProfile() async {
+    final user = _client.auth.currentUser;
+    final session = _client.auth.currentSession;
+    if (user == null || session == null || session.user.id != user.id) {
+      throw StateError('Please sign in first to use your AI coach.');
+    }
+
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (profile != null) return;
+    } catch (_) {
+      await _upsertProfile(user);
+      await _client.from('profiles').select('id').eq('id', user.id).single();
+      return;
+    }
+
+    await _upsertProfile(user);
+    await _client.from('profiles').select('id').eq('id', user.id).single();
+  }
+
+  Future<void> _upsertProfile(User user) async {
+    await _client.from('profiles').upsert({'id': user.id});
   }
 
   // ---------------------------------------------------------------------------
@@ -115,10 +151,7 @@ class AiDbHelper {
 
     final result = await _client
         .from('ai_conversations')
-        .insert({
-      'user_id': userId,
-      'title': title,
-    })
+        .insert({'user_id': userId, 'title': title})
         .select('id')
         .single();
 
@@ -163,17 +196,15 @@ class AiDbHelper {
     // Update the conversation's activity time for history ordering.
     await _client
         .from('ai_conversations')
-        .update({
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    })
+        .update({'updated_at': DateTime.now().toUtc().toIso8601String()})
         .eq('id', conversationId)
         .eq('user_id', userId);
   }
 
   /// Loads all messages in chronological order for one conversation.
   Future<List<Map<String, dynamic>>> loadConversationMessages(
-      String conversationId,
-      ) async {
+    String conversationId,
+  ) async {
     final userId = _requireUserId();
 
     // Confirm that the selected conversation belongs to this user.
@@ -237,19 +268,21 @@ class AiDbHelper {
     // Limit history to the most recent 20 messages.
     final cleanHistory = history
         .where((message) {
-      final role = message['role'];
-      final content = message['content'];
+          final role = message['role'];
+          final content = message['content'];
 
-      return (role == 'user' || role == 'assistant') &&
-          content != null &&
-          content.trim().isNotEmpty;
-    })
+          return (role == 'user' || role == 'assistant') &&
+              content != null &&
+              content.trim().isNotEmpty;
+        })
         .toList()
         .take(20)
-        .map((message) => {
-      'role': message['role']!,
-      'content': message['content']!.trim(),
-    })
+        .map(
+          (message) => {
+            'role': message['role']!,
+            'content': message['content']!.trim(),
+          },
+        )
         .toList();
 
     final response = await _client.functions.invoke(
@@ -264,9 +297,7 @@ class AiDbHelper {
     final data = response.data;
 
     if (response.status < 200 || response.status >= 300) {
-      throw Exception(
-        'Could not get an AI response: ${_errorMessage(data)}',
-      );
+      throw Exception('Could not get an AI response: ${_errorMessage(data)}');
     }
 
     if (data is Map && data['answer'] is String) {
@@ -277,9 +308,7 @@ class AiDbHelper {
       }
     }
 
-    throw Exception(
-      'The AI function returned an unexpected response.',
-    );
+    throw Exception('The AI function returned an unexpected response.');
   }
 
   // ---------------------------------------------------------------------------
@@ -296,10 +325,7 @@ class AiDbHelper {
 
     final response = await _client.functions.invoke(
       'smooth-api',
-      body: {
-        'action': 'add_task',
-        'title': title,
-      },
+      body: {'action': 'add_task', 'title': title},
     );
 
     final data = response.data;
@@ -311,9 +337,7 @@ class AiDbHelper {
     }
 
     if (data is! Map || data['success'] != true) {
-      throw Exception(
-        'The server did not confirm that the task was saved.',
-      );
+      throw Exception('The server did not confirm that the task was saved.');
     }
   }
 

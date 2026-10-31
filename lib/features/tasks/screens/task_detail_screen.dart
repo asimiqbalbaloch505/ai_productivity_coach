@@ -1,15 +1,5 @@
 import 'package:flutter/material.dart';
 
-<<<<<<< HEAD
-class TaskDetailScreen extends StatelessWidget {
-  const TaskDetailScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('Task Detail Screen'),
-=======
 import '../task_models.dart';
 import 'add_task_screen.dart';
 
@@ -38,9 +28,11 @@ class TaskDetailScreen extends StatelessWidget {
         children: [
           Text(task.title, style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
-          Text(task.description?.isNotEmpty == true
-              ? task.description!
-              : 'No description'),
+          Text(
+            task.description?.isNotEmpty == true
+                ? task.description!
+                : 'No description',
+          ),
           const SizedBox(height: 24),
           Text('Priority: ${task.priority.value}'),
           if (task.deadline != null)
@@ -51,7 +43,6 @@ class TaskDetailScreen extends StatelessWidget {
           Text(task.isRecurring ? 'Recurring' : 'Not recurring'),
           Text(task.isCompleted ? 'Completed' : 'Incomplete'),
         ],
->>>>>>> origin/feature/tasks
       ),
     );
   }

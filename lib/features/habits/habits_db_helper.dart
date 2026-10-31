@@ -32,17 +32,20 @@ class HabitsDBHelper {
     int? goalDays,
     String? cue,
   }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      throw StateError('A signed-in user is required to create a habit.');
+    }
     final base = <String, dynamic>{
-      'user_id': _supabase.auth.currentUser?.id,
+      'user_id': user.id,
       'title': title.trim(),
       'frequency': frequency.dbValue,
       'streak_count': 0,
     };
-    final extras = <String, dynamic>{
-      'reminder_time': reminderTime,
-      'goal_days': goalDays,
-      'cue': cue,
-    };
+    final extras = <String, dynamic>{};
+    if (reminderTime != null) extras['reminder_time'] = reminderTime;
+    if (goalDays != null) extras['goal_days'] = goalDays;
+    if (cue != null) extras['cue'] = cue;
     try {
       await _supabase.from('habits').insert({...base, ...extras});
     } on PostgrestException catch (e) {
@@ -101,18 +104,16 @@ class HabitsDBHelper {
 
   /// Logs for the given habits on or after [from].
   Future<List<HabitLog>> getLogsSince(
-      List<String> habitIds,
-      DateTime from,
-      ) async {
+    List<String> habitIds,
+    DateTime from,
+  ) async {
     if (habitIds.isEmpty) return [];
     final data = await _supabase
         .from('habit_logs')
         .select()
         .inFilter('habit_id', habitIds)
         .gte('completed_at', formatDbDate(from));
-    return List<Map<String, dynamic>>.from(data)
-        .map(HabitLog.fromMap)
-        .toList();
+    return List<Map<String, dynamic>>.from(data).map(HabitLog.fromMap).toList();
   }
 
   /// Marks the habit as completed / skipped for today (one log per habit per
@@ -164,7 +165,8 @@ class HabitsDBHelper {
     final streak = computeStreak(dates, habit.frequency, DateTime.now());
     await _supabase
         .from('habits')
-        .update({'streak_count': streak}).eq('id', habit.id);
+        .update({'streak_count': streak})
+        .eq('id', habit.id);
     return streak;
   }
 
@@ -190,10 +192,10 @@ class HabitsDBHelper {
   /// check-in yet it is not counted but does not break the streak. A skipped
   /// or missed period breaks it.
   static int computeStreak(
-      List<DateTime> completedDates,
-      HabitFrequency frequency,
-      DateTime now,
-      ) {
+    List<DateTime> completedDates,
+    HabitFrequency frequency,
+    DateTime now,
+  ) {
     final today = dateOnly(now);
     final isWeekly = frequency == HabitFrequency.weekly;
 

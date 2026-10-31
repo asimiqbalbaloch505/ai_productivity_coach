@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../main.dart' show MainNavigationScreen;
 import '../auth_db_helper.dart';
 import '../auth_theme.dart';
 import 'reset_password_screen.dart';
@@ -43,12 +42,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _auth.signIn(email: _email.text.trim(), password: _password.text);
-
-      if (!mounted) return;
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-      );
     } on AuthException catch (e) {
       if (mounted) {
         _message(e.message);

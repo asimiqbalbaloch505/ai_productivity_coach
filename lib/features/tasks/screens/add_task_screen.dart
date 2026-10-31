@@ -1,15 +1,5 @@
 import 'package:flutter/material.dart';
 
-<<<<<<< HEAD
-class AddTaskScreen extends StatelessWidget {
-  const AddTaskScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text('Add Task Screen'),
-=======
 import '../task_models.dart';
 import '../tasks_db_helper.dart';
 
@@ -80,14 +70,15 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       isRecurring: _isRecurring,
     );
     try {
-      final saved =
-          _isEditing ? await _db.updateTask(task) : await _db.createTask(task);
+      final saved = _isEditing
+          ? await _db.updateTask(task)
+          : await _db.createTask(task);
       if (mounted) Navigator.pop(context, saved);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to save task: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to save task: $error')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -120,19 +111,23 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               initialValue: _priority,
               decoration: const InputDecoration(labelText: 'Priority'),
               items: TaskPriority.values
-                  .map((priority) => DropdownMenuItem(
-                        value: priority,
-                        child: Text(priority.value),
-                      ))
+                  .map(
+                    (priority) => DropdownMenuItem(
+                      value: priority,
+                      child: Text(priority.value),
+                    ),
+                  )
                   .toList(),
               onChanged: (value) =>
                   setState(() => _priority = value ?? TaskPriority.medium),
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(_deadline == null
-                  ? 'No deadline'
-                  : 'Deadline: ${_deadline!.toLocal().toString().split(' ').first}'),
+              title: Text(
+                _deadline == null
+                    ? 'No deadline'
+                    : 'Deadline: ${_deadline!.toLocal().toString().split(' ').first}',
+              ),
               trailing: IconButton(
                 icon: const Icon(Icons.calendar_today),
                 onPressed: _pickDeadline,
@@ -154,7 +149,6 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             ),
           ],
         ),
->>>>>>> origin/feature/tasks
       ),
     );
   }
